@@ -686,9 +686,20 @@ function Get-VirtualNetworkInfo {
 } 
 
 function Get-RfaLtNewestComputerId {
-    param (
-        $URL = "https://automate.rfa.com/RFADL/NewestID.txt"
-    )    
-    (new-object Net.WebClient).DownloadString($URL).Trim() -as [int]
+    
+    $Uri = "https://automate.rfa.com/RFADL/NewestID.txt"
+    
+    (new-object Net.WebClient).DownloadString($Uri).Trim() -as [int]
+
 }
 $global:RfaLtNewestComputerId = Get-RfaLtNewestComputerId
+
+function Get-RfaLtMacBlockList {
+    
+    $Uri = "https://automate.rfa.com/RFADL/MacBlock.txt"
+    
+    (new-object Net.WebClient).DownloadString($Uri) -split "`n" |
+        Foreach-Object { $_.Trim() }
+
+}
+$global:RfaLtMacBlockList = Get-RfaLtMacBlockList
