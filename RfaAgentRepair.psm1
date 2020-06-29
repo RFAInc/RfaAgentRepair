@@ -284,7 +284,23 @@ $Cert = Get-ChildItem 'Cert:\LocalMachine\' -Recurse |
 
 
 function Test-LtInstall {
-
+    <#
+    .SYNOPSIS
+    Determines a healthy state for the Remote Agent.
+    .DESCRIPTION
+    Looks at the current settings of the Automate agent and returns information based on findings for further processing.
+    .PARAMETER LocationShouldBe
+    Required for testing all 
+    .PARAMETER ServerShouldBeLike
+    Value should include wildcards (*) to match against the server the agent shold be connecting to.
+    If this check fails the remote agent is checking into a different IT firm's Automate server. 
+    .PARAMETER SkipLocationCheck
+    The default case, if no parameters are given. This switch bypasses location ID verification.
+    .PARAMETER InstalledOnly
+    This switch will bypass all health checks and only return a boolean that, if true, means the remote agent service is present.
+    .PARAMETER Quiet
+    This switch will return a simple boolean which aggregates all health tests. False means at least 1 test failed.
+    #>
     [CmdletBinding(DefaultParameterSetName='SkipLocationCheck')]
 
     param (
@@ -297,8 +313,11 @@ function Test-LtInstall {
         
         [Parameter(ParameterSetName='SkipLocationCheck')]
         [switch]$SkipLocationCheck,
+        
         [Parameter(ParameterSetName='InstalledOnly')]
         [switch]$InstalledOnly,
+        
+        [Parameter(ParameterSetName='Location')]
         [switch]$Quiet
     )
 
@@ -311,6 +330,7 @@ function Test-LtInstall {
     $TestPass = $true
     $LTServiceInfo = Get-LTServiceInfo
     
+    # Run all tests
     if ($InstalledOnly) {
 
         if (-not $LTServiceInfo) {$TestPass = $false}
@@ -339,6 +359,7 @@ function Test-LtInstall {
     if ($Quiet -or $InstalledOnly) {
         Write-Output $TestPass
     } else {
+        # Output an object with all results
         [PSCustomObject]@{
             TestPass = $TestPass
             FailReason = $FailReason
@@ -346,6 +367,8 @@ function Test-LtInstall {
             LocationID = $LocationIs
             LastSuccessStatus = $LastContactIs
             ServiceVersion = $ServiceVersionIs
+            ComputerId = $LTServiceInfo.Id
+            ComputerIdIsNew = $LTServiceInfo.Id -gt $global:RfaLtNewestComputerId
         }
     }
 
@@ -608,14 +631,23 @@ function Assert-RootCertificateAutoUpdate {
 
 
 function Get-VirtualNetworkInfo {
+    <#
+    .SYNOPSIS
+    Tool discovers Software VPN adapters for purposes of Labtech agent install MAC Signup case handling.
+    .DESCRIPTION
+    Finds any ipconfig output lines with 'virtual' in the description and returns pertanent info about that adapter.
+    .EXAMPLE
+    $BreakOut = $false ; Get-VirtualNetworkInfo | %{if ($_.isActive) {$BreakOut = $true}} ; if ($BreakOut) {break}
     
-    # DESCRIPTION
-    # Finds any ipconfig output lines with 'virtual' in the description.
+    Putting this line in your script will break the script if it finds an active software VPN connection.
     
-    # Can be used for detecting a vNIC on deployment script and bailing out if one is connected. 
-    # Another idea, pause deployment at this stage and wait for the tech to advance,
-    #  after purging records of the returned MAC from the DB.
-
+    .NOTES
+    Can be used for detecting a vNIC on deployment script and bailing out if one is connected. 
+    Another idea, pause deployment at this stage and wait for the tech to advance,
+     after purging records of the returned MAC from the DB.
+    #>
+    
+    [CmdletBinding()]
     
     # Record the result of the IP config all command to a variable
     $ipresult = ipconfig /all
@@ -625,7 +657,7 @@ function Get-VirtualNetworkInfo {
     
     # Find any ipconfig output lines with the description that matches the pattern, the next line down is the MAC address 
     #  We would look for the very next line, or add one to this number, and then subtract 1 to get that next line's index.
-    #  (or we can say that the line number equals the next index number)
+    #  (or we can say that the line number equals the next one's index number)
     $vMACindex = ($ipresult | Select-String -Pattern $ptnVirtual | select -exp LineNumber)
     
     # For each index we find the MAC and if media is disconnected or not
@@ -653,3 +685,10 @@ function Get-VirtualNetworkInfo {
     }
 } 
 
+function Get-RfaLtNewestComputerId {
+    param (
+        $URL = "https://automate.rfa.com/RFADL/NewestID.txt"
+    )    
+    (new-object Net.WebClient).DownloadString($URL).Trim() -as [int]
+}
+$global:RfaLtNewestComputerId = Get-RfaLtNewestComputerId
