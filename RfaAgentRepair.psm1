@@ -184,6 +184,9 @@ function Repair-LtServiceFlap {
         [switch]$Force=$false
     )
     
+    Write-Warning 'Outdated function "Repair-LtServiceFlap" has been disabled.'
+    
+    <#
     $TempPath = "$env:WINDIR\Temp\LTInstall";
     if (Test-Path $TempPath) {} else {
         New-Item -ItemType Directory $TempPath -Force | Out-Null;
@@ -238,6 +241,7 @@ function Repair-LtServiceFlap {
             "Is the lt error log active?: $($hasErrors)" | Tee-Object -FilePath $Log | echo;
         };
     };
+    #>
 };
 
 function Repair-RfaAgentDuplicateID {
@@ -386,7 +390,9 @@ function Repair-LtAgent496 {
         [switch]$MSI
     )
 
-
+    Write-Warning 'Outdated function "Repair-LtAgent496" has been disabled.'
+    
+    <#
     $ErrorActionPreference='SilentlyContinue';
 
     $ServiceVersionIs = Try {
@@ -450,7 +456,7 @@ function Repair-LtAgent496 {
     } else {
         Write-Warning "Was not able to confirm $targetVersion as the currently installed version of LabTech on $($env:COMPUTERNAME)."
     }#END if ($ServiceVersionIs -eq '120.496')
-
+    #>
 }
 
 
