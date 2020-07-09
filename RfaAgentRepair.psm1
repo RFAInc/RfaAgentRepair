@@ -1,5 +1,12 @@
-# Load external module
-(new-object Net.WebClient).DownloadString('http://bit.ly/LTPoSh') | iex;
+# Load other modules/functions
+$OtherModules = @(
+    'https://raw.githubusercontent.com/RFAInc/RfaRmmTools/master/RfaRmmTools.psm1'
+)
+Foreach ($uri in $OtherModules) {
+    $web.DownloadString($uri) | Invoke-Expression
+}
+# Clean up
+$web.Dispose | Out-Null
 
 
 function Confirm-RequiresAdmin {
@@ -265,17 +272,21 @@ function Repair-RfaAgentDuplicateID {
     $oldAgentID = Get-LTServiceInfo | Select-Object -ExpandProperty ID
 
     # remove the agent
-    uninstall-LTService -Server 'https://automate.rfa.com' -force;
-    Start-Sleep 60
+    Uninstall-LTService -Server 'https://automate.rfa.com' -force
+    Start-Sleep 10
 
     # Install the agent
-    install-LTService -Server 'https://automate.rfa.com' -ServerPassword '+KuQQJbctLbr7IrXfLCLcg==' -SkipDotNet -Hide -LocationID $LocationID;
-    Start-Sleep 60
+    Install-RfaRmmAgent $LocationID
+    Start-Sleep 10
 
     # Return the Agent ID
     $newAgentID = Get-LTServiceInfo | Select-Object -ExpandProperty ID
     if ($oldAgentID -eq $newAgentID) {
-        Write-Warning "The agent ID $($newAgentID) has not been changed after reinstallation. Please review the logs and try again."
+        Write-Warning "The agent ID $($newAgentID) has not been changed after reinstallation."
+        Write-Output "Please review the logs and try again."
+        Write-Output "If the issue persists, verify these 2 things:"
+        Write-Output "1. You may have tand active software VPN with a hardcoded MAC address. Disable the VPN and retry."
+        Write-Output "2. You may have to ask an admin to purge the record for ID $($NewAgentID)."
     } else {
         Write-Output "New ComputerID confirmed."
     }
