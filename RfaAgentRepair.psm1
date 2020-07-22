@@ -1,13 +1,14 @@
+<#
 # Load other modules/functions
 $OtherModules = @(
-    'https://raw.githubusercontent.com/RFAInc/RfaRmmTools/master/RfaRmmTools.psm1'
+    
 )
 Foreach ($uri in $OtherModules) {
     $web.DownloadString($uri) | Invoke-Expression
 }
 # Clean up
 $web.Dispose | Out-Null
-
+#>
 
 function Confirm-RequiresAdmin {
 
