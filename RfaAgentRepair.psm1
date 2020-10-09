@@ -103,7 +103,7 @@ function Test-LtErrors
 {
     $elog='C:\windows\ltsvc\lterrors.txt';
     $read1=gc $elog -ea 0;
-    sleep 25;
+    Start-Sleep 25;
     $read2=gc $elog -ea 0;
     
     if (($read2.count - $read1.count) -eq 0)
@@ -302,7 +302,7 @@ $Cert = Get-ChildItem 'Cert:\LocalMachine\' -Recurse |
 function Test-LtInstall {
     <#
     .SYNOPSIS
-    Determines a healthy state for the Remote Agent.
+    Tests the local machine for installation and functionality.
     .DESCRIPTION
     Looks at the current settings of the Automate agent and returns information based on findings for further processing.
     .PARAMETER LocationShouldBe
@@ -321,8 +321,9 @@ function Test-LtInstall {
 
     param (
         # Required parameter at runtime
-        [Parameter(Mandatory=$true,ParameterSetName='Location')]
-        [int]$LocationShouldBe,
+        #removed because registry doesn't always = actual platform location due to MACSignup.
+        #[Parameter(Mandatory=$true,ParameterSetName='Location')]
+        #[int]$LocationShouldBe,
         
         # Set the "pass" conditions
         [string]$ServerShouldBeLike = '*automate.rfa.com*',
@@ -331,20 +332,22 @@ function Test-LtInstall {
         [switch]$SkipLocationCheck,
         
         [Parameter(ParameterSetName='InstalledOnly')]
+        [Alias('Generic')]
         [switch]$InstalledOnly,
         
-        [Parameter(ParameterSetName='Location')]
+        [Parameter()]
+        #[Parameter(ParameterSetName='Location')]
         [switch]$Quiet
     )
 
     # Set the remaining "pass" conditions
-    $LastContactShouldBeGreaterThan = (Get-Date).AddMinutes(-5)
+    #$LastContactShouldBeGreaterThan = (Get-Date).AddMinutes(-5) #removed because dates as strings in registry always fail in EU/UK
     $ServiceVersionShouldBe = Get-LtServerVersion
     Write-Debug "DEBUG: ServiceVersionShouldBe: $($ServiceVersionShouldBe)"
     
     # Check for existing install
     $TestPass = $true
-    $LTServiceInfo = Get-LTServiceInfo
+    $LTServiceInfo = Get-LTServiceInfo -ErrorAction SilentlyContinue
     
     # Run all tests
     if ($InstalledOnly) {
@@ -356,6 +359,7 @@ function Test-LtInstall {
         [string]$FailReason = ''
         $ServerIs = $LTServiceInfo.'Server Address'
         $LocationIs = $LTServiceInfo.LocationID
+        $AgentIdIs = $LTServiceInfo.ID -as [int]
         $LastContactIs = $LTServiceInfo.LastSuccessStatus -as [datetime]
         Write-Debug "DEBUG: LastContact: $($LastContactIs)"
         $ServiceVersionIs = (Get-Item 'C:\Windows\LtSvc\LtSvc.exe').versioninfo |
@@ -365,8 +369,9 @@ function Test-LtInstall {
         # Test the info vs the conditions
         if ($ServerIs -notlike $ServerShouldBeLike) {$TestPass = $false ; $FailReason += 'Wrong Server, '}
         if ($ServiceVersionIs -ne $ServiceVersionShouldBe) {$TestPass = $false ; $FailReason += 'Wrong Version, '}
-        if (!$SkipLocationCheck -and $LocationIs -ne $LocationShouldBe) {$TestPass = $false ; $FailReason += 'Wrong Location, '}
-        if (-not ($LastContactIs -ge $LastContactShouldBeGreaterThan)) {$TestPass = $false ; $FailReason += 'Old LastContact.'}
+        #if (!$SkipLocationCheck -and $LocationIs -ne $LocationShouldBe) {$TestPass = $false ; $FailReason += 'Wrong Location, '}#removed because registry doesn't always = actual platform location due to MACSignup.
+        #if (-not ($LastContactIs -ge $LastContactShouldBeGreaterThan)) {$TestPass = $false ; $FailReason += 'Old LastContact.'}#removed because dates as strings in registry always fail in EU/UK
+        if (-not ($AgentIdIs -gt 0)) {$TestPass = $false ; $FailReason += 'Missing AgentID, '}
     
         Write-Debug "DEBUG: TestPass: $($TestPass)"
 
@@ -383,7 +388,7 @@ function Test-LtInstall {
             LocationID = $LocationIs
             LastSuccessStatus = $LastContactIs
             ServiceVersion = $ServiceVersionIs
-            ComputerId = $LTServiceInfo.Id
+            AgentId = $AgentIdIs
             ComputerIdIsNew = $LTServiceInfo.Id -gt $global:RfaLtNewestComputerId
         }
     }
