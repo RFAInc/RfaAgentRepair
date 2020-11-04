@@ -163,14 +163,16 @@ function Invoke-KillLabTech {
 }
 
 function Invoke-NukeLabTech {
-    Invoke-KillLabTech
-    Disable-LtService;sleep 2;
-    Stop-LtProcess;sleep 2;
-    Remove-LtService;sleep 2;
-    Start-RfaLtUninstaller;sleep 2;
-    gi c:\windows\ltsvc -ea 0 | Remove-Item -Force -Recurse;
-    gi c:\programData\labtech -ea 0 | Remove-Item -Force -Recurse;
-    gi hklm:\software\labtech -ea 0 | Remove-Item -Force -Recurse;
+    if ($env:COMPUTERNAME -ne 'RFALABTECHWEBCC') {
+        Invoke-KillLabTech
+        Disable-LtService;sleep 2;
+        Stop-LtProcess;sleep 2;
+        Remove-LtService;sleep 2;
+        Start-RfaLtUninstaller;sleep 2;
+        gi c:\windows\ltsvc -ea 0 | Remove-Item -Force -Recurse;
+        gi c:\programData\labtech -ea 0 | Remove-Item -Force -Recurse;
+        gi hklm:\software\labtech -ea 0 | Remove-Item -Force -Recurse;
+    }
 }
 
 function Enable-LtService {
@@ -184,72 +186,6 @@ function Get-VersionDotNet ()
     Get-ItemProperty -name Version,Release -EA 0 |
     Where { $_.PSChildName -match '^(?!S)\p{L}'} |
     Select PSChildName, Version, Release;
-};
-
-function Repair-LtServiceFlap {
-    param (
-        # Force the reinstall is the service is not flapping. (Recommended to just run Reinstall-LtService function from ltposh).
-        [switch]$Force=$false
-    )
-    
-    Write-Warning 'Outdated function "Repair-LtServiceFlap" has been disabled.'
-    
-    <#
-    $TempPath = "$env:WINDIR\Temp\LTInstall";
-    if (Test-Path $TempPath) {} else {
-        New-Item -ItemType Directory $TempPath -Force | Out-Null;
-    };
-
-    $Log = Join-Path $TempPath 'ltinstall.txt'
-
-    ECHO "Running PS1 script on $($env:COMPUTERNAME) at $(d)";
-
-    # Initial QA
-    $hasService = [bool](gsv ltservice -ea 0);
-    "The ltservice is installed: $($hasService)" | Tee-Object -FilePath $Log | echo;
-    if ($hasService) {
-        $isFlapping = Test-LtFlapping;
-        "Is the service ltserice flapping?: $($isFlapping)" | Tee-Object -FilePath $Log | echo;
-        if (!$isFlapping -and !$Force) {
-            ECHO "Exiting PS1 script on $($env:COMPUTERNAME) at $(d): No flapping issue detected";
-            break
-        };
-    };
-
-    $TempPath = "$env:WINDIR\Temp\LTInstall";
-    if (Test-Path $TempPath) {} else {
-        New-Item -ItemType Directory $TempPath -Force | Out-Null;
-    };
-
-    # Define the LID
-    [int]$lid = Get-LTServiceInfo -ea 0 | Select-Object -ExpandProperty LocationID
-    [int]$LocationID = if ($lid -gt 1) {$lid} else {1};
-    ECHO "Using Location ID: $($LocationID)";
-
-    # remove the agent
-    uninstall-LTService -Server 'https://automate.rfa.com' -force;
-    sleep 60;
-
-    # Install the agent
-    install-LTService -Server 'https://automate.rfa.com' -ServerPassword '+KuQQJbctLbr7IrXfLCLcg==' -SkipDotNet -Hide -LocationID $LocationID;
-
-    # Final QA
-    $hasService = [bool](gsv ltservice -ea 0).Status;
-    "The ltservice was installed successfully: $($hasService)" | Tee-Object -FilePath $Log | echo;
-    if ($hasService) {
-        $isFlapping = Test-LtFlapping;
-        "Is the service ltserice flapping?: $($isFlapping)" | Tee-Object -FilePath $Log | echo;
-        if ($isFlapping) {
-            Disable-LtService;
-            Stop-LtFlapping;
-            "Service disabled and stopped. Service ltservice status is currently: ($(
-                (gsv ltservice -ea 0).Status))" | Tee-Object -FilePath $Log | echo;
-        } else {
-            $hasErrors = Test-LtErrors;
-            "Is the lt error log active?: $($hasErrors)" | Tee-Object -FilePath $Log | echo;
-        };
-    };
-    #>
 };
 
 function Repair-RfaAgentDuplicateID {
@@ -395,93 +331,6 @@ function Test-LtInstall {
 
 }#END function Test-LtInstall
 
-function Repair-LtAgent496 {
-    # This function will reinstall the agent and make sure the location and agent IDs remain the same.
-    # If not, a message will be given or thrown, depending on the severity of the result.
-    
-    param (
-        # Do not check for version number, just re/install. You may get weird results.
-        [switch]$Force,
-    
-        # Safer than Force. Should not be enabled in unattended shells or in batches.
-        [switch]$MSI
-    )
-
-    Write-Warning 'Outdated function "Repair-LtAgent496" has been disabled.'
-    
-    <#
-    $ErrorActionPreference='SilentlyContinue';
-
-    $ServiceVersionIs = Try {
-        (Get-Item 'C:\Windows\LtSvc\LtSvc.exe' -ea Stop).versioninfo |
-            Foreach-Object {($_.FileMajorPart -as [string]) + '.' + ($_.FileMinorPart)}
-    } Catch {
-        'error'
-    };
-    
-    $targetVersion = '120.496';
-    
-    if ($MSI -and (Get-Item 'C:\Windows\LtSvc\LtSvc.exe' -ea Stop)) {
-
-        if ((Read-Host "LabTech not installed. Run MSI now? (y/n)") -like 'y*') {
-            Invoke-KillLabTech;
-            Start-RfaLtInstaller;
-        }
-
-    }elseif ($ServiceVersionIs -eq $targetVersion -or $Force) {
-
-        $oldInfo=Get-LTServiceInfo;
-
-        Try {
-            Uninstall-LTService -Server 'https://automate.rfa.com' -Force -ea Stop;
-        } Catch {
-            Invoke-KillLabTech;
-        };
-
-        Sleep 5;
-        if (Test-LtRemnants) { "Killing LabTech"; Invoke-KillLabTech};
-
-        Try {
-            sleep 5;
-            Install-LTService -Server 'https://automate.rfa.com' -ServerPassword '+KuQQJbctLbr7IrXfLCLcg==' -Hide -LocationID ($oldInfo.LocationID) -ea Stop;
-        } Catch {
-            sleep 5;
-            Install-LTService -Server 'https://automate.rfa.com' -ServerPassword '+KuQQJbctLbr7IrXfLCLcg==' -Hide -LocationID ($oldInfo.LocationID) -SkipDotNet;
-        };
-        
-
-        $newInfo=Get-LTServiceInfo -ea 0;
-        if ($null -eq $newInfo) {
-            $ErrorActionPreference = 'Stop'
-            'Install-LTService -Server "https://automate.rfa.com" -ServerPassword "+KuQQJbctLbr7IrXfLCLcg==" -Hide -LocationID 1 -SkipDotNet'
-            throw "Reinstall failed. Please connect to $($env:COMPUTERNAME) and manually reinstall the agent. Use the above line"
-        };
-        
-
-        if ($Force -and $newInfo.ID -gt 0) {
-            "Reinstalled $($env:COMPUTERNAME) under ID $($newInfo.ID), Location $($newInfo.locationid)"
-        } elseif ($oldInfo.locationid -eq $newInfo.locationid -and $oldInfo.computerid -eq $newInfo.computerid) {
-            "Reinstalled OK. $($env:COMPUTERNAME)"
-        }elseif ($oldInfo.locationid -eq $newInfo.locationid){
-            "Reinstalled $($env:COMPUTERNAME) as a new agentid $($newInfo.id). Please ensure that the old agentID $($oldInfo.id) is migrated to the new one."
-        }elseif ($oldInfo.computerid -eq $newInfo.computerid){
-            "Reinstalled $($env:COMPUTERNAME) under location ID $($newLID). Please move the device back to Location ID $($oldInfo.locationid)"
-        }else{
-            "Reinstalled $($env:COMPUTERNAME) under ID $($newInfo.ID). Please move the device back to Location ID $($oldInfo.locationid)"
-        };
-
-    } else {
-        Write-Warning "Was not able to confirm $targetVersion as the currently installed version of LabTech on $($env:COMPUTERNAME)."
-    }#END if ($ServiceVersionIs -eq '120.496')
-    #>
-}
-
-
-<# to be tested to see if this throws false pos/neg results. 
-$Cert = Get-ChildItem 'Cert:\LocalMachine\' -Recurse |
-    Where-Object {$_.FriendlyName -like "GlobalSign Root CA*"}
-#>
-
 function Repair-RfaLtAgent {
 
     <# DESCRIPTION
@@ -615,7 +464,6 @@ function Repair-RfaLtAgent {
     }
 
 }
-
 
 function Assert-RootCertificateAutoUpdate {
 
